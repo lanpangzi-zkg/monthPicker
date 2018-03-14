@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>month picker</title>
+		<meta charset="utf-8">
+		<style type="text/css">
+			html, body {
+				height: 100%;
+			}
+			* {
+				margin: 0;
+				padding: 0;
+			}
+			body {
+				padding: 10px;
+			}
+			ul, li {
+				list-style: none;
+			}
+			.picker {
+				position: absolute;
+				width: 150px;
+				z-index: 9999;
+				display: none;
+				border: 1px solid #c5d5dc;
+			}
+			.picker .header {
+			    text-align: center;
+			    height: 35px;
+			    line-height: 35px;
+			    border-bottom: 1px solid #e8e8e8;
+			}
+			.picker .header .year{
+			    margin: 0 35px;
+			    vertical-align: middle;
+			}
+			.picker .picker-btn {
+		        display: inline-block;
+			    width: 20px;
+				cursor: pointer;
+			    vertical-align: middle;
+			}
+			.picker .picker-btn:hover {
+				color: #469ef5;
+			}
+			.picker .picker-btn.dis {
+			    color: #cecece;
+				cursor: not-allowed;
+			}
+			.picker .picker-content {
+				margin-top: 5px;
+			    text-align: center;
+			    font-size: 14px;
+			}
+			.picker .picker-content li {
+			    display: inline-block;
+    			width: 38px;
+				margin: 10px 5px;
+				cursor: pointer;
+				text-align: center;
+				transition: all ease 0.4s;
+			}
+			.picker .picker-content li.disable {
+				cursor: not-allowed;
+				color: #cecece;
+			}
+			.picker .picker-content li.disable:hover {
+				background-color: inherit;
+				color: #cecece;
+			}
+			.picker .picker-content li:hover {
+				background-color: #469ef5;
+				color: #fff;
+			}
+		</style>
+	</head>
+	<body>
+		<input id="demo1" name="d1" placeholder="对账月份">
+		<input id="demo2" name="d2" placeholder="对账月份">
+	</body>
+	<script src="https://cdn.bootcss.com/jquery/3.1.0/jquery.min.js"></script>
+	<script type="text/javascript">
+		var picker = (function() {
+			var defultConfig = {
+				year: 0, // 选择的年份
+				maxYear: 0, // 最新的年份
+				maxMonth: 0, // 最新的月份
+				$dom: null,
+				$picker: null,
+				$pre: null,
+				$next: null,
+				selectDate: 0, // 当前选择的日期
+				gapMonth : 12, // 月份选择范围
+				gapYear : 0,
+				max : 0,
+				callBack : null
+			};
+
+			function Picker(config) {
+				for (var k in defultConfig) {
+					this[k] = defultConfig[k];
+				}
+				this.initComponet(config);
+			}
+			Picker.prototype = {
+				constructor: Picker,
+				initComponet: initComponet,
+				getDate: getDate
+			}
+			function init(config) {
+				var p = new Picker(config);
+				return p;
+			}
+			function initComponet(config) {
+				initConfig.call(this, config);
+				initDate.call(this);
+				initDom.call(this);
+				initPicker.call(this);
+				initEvent.call(this);
+			}
+			function initConfig(config) {
+				config = config || {};
+				this.callBack = typeof config.onChange === 'function' ? config.onChange : function(){};
+				this.gapMonth = isNaN(config.gapMonth) ? 12 : Math.abs(parseInt(config.gapMonth));
+				this.$dom = $(config.el);
+				if (this.$dom.length === 0) {
+					throw new Error('element did not found:' + config.el);
+				}
+			}
+			function initDate() {
+				var date = new Date();
+				this.year = this.maxYear = date.getFullYear();
+				this.maxMonth = date.getMonth() + 1;
+				var gapMonth = this.gapMonth,
+					maxMonth = this.maxMonth;
+				if (gapMonth >= maxMonth) {  // 可以选择上一年
+					var tempYear = gapMonth % 12 === 0 ? gapMonth / 12 : parseInt(gapMonth / 12) + 1;
+					this.gapYear = Math.max(1, tempYear);
+				}
+				this.max = (gapMonth - maxMonth) % 12;
+			}
+			function initDom() {
+				var maxYear = this.maxYear,
+					$picker = $(pickerTemplate(maxYear));
+				this.$picker = $picker;
+				$('body').append($picker);
+				this.$pre = $picker.find('.pre');
+				this.$next = $picker.find('.next');
+			}
+			function pickerTemplate(year) {
+				return '<div class="picker"><div class="header">' +
+						'<span class="pre picker-btn"><</span>' +
+						'<span class="year">' + year + '</span>' +
+						'<span class="next picker-btn dis" disabled>></span></div>' +
+						'<ul class="picker-content"></ul>' +
+						'</div>';
+			}
+			function prevent(e) {
+				e.stopPropagation();
+			}
+			function initEvent() {
+				var $picker = this.$picker,
+					$dom = this.$dom,
+					context = this;
+				$dom.on('click', function(e) {
+					prevent(e);
+					$picker.is(":hidden") ? $picker.show() : $picker.hide();
+				});
+				$dom.on('blur', function(e) {
+					prevent(e);
+					var _val = $(this).val();
+					if (_val && !(/^20[0-9]{2}年(0[1-9]|1[0-2])月$/).test(_val)) {
+						$(this).val('');
+					} else {
+						var _year = parseInt(_val.slice(0, 4));
+						if (_year > context.maxYear || _year + context.gapYear < context.maxYear) {
+							$(this).val('');
+							return;
+						}
+						var _month = _val.slice(-3, -1);
+						if (_month > context.maxMonth) {
+							$(this).val('');
+						}
+					}
+				});
+				$picker.on('click', '.pre', function(e) {
+					prevent(e);
+					preYear.call(context);
+				});
+				$picker.on('click', '.next', function(e) {
+					prevent(e);
+					nextYear.call(context);
+				});
+				$picker.on('click', '.picker-content li', function(e) {
+					prevent(e);
+					$this = $(this);
+					if ($this.hasClass('disable')) {
+						return;
+					}
+					var selectDate = $this.data('time') +'';
+					context.selectDate = selectDate;
+					$dom.val(selectDate.slice(0, 4) + '年' + selectDate.slice(-2) + '月');
+					onChange.call(context ,selectDate);
+					$picker.hide();
+				});
+				$("body").on('click', function(e) {
+					var $this = $(e.target);
+					if ($this !== $picker) {
+						$picker.hide();
+					}
+				});
+			}
+			
+			function initPicker() {
+				var $picker = this.$picker;
+				var $dom = this.$dom;
+				var year = this.year;
+				var _h = $dom.height(),
+					_pd = parseInt($dom.css('border')) + 1,
+					_left = $dom.offset().left,
+					_top = $dom.offset().top;
+
+				$picker.css({
+					left: _left,
+					top: _top + _h + _pd,
+				});
+
+				var dateArr = [];
+				for(var i = 1; i <= 12; i++) {
+					dateArr.push(gerTemplate.call(this, i));
+				}
+				$picker.find('.picker-content').html(dateArr.join(''));
+			}
+			function updateOptions() {
+				var $picker = this.$picker;
+				var year = this.year;
+				var ch = $picker.find('.picker-content').children();
+				for(var i = 0, j = ch.length; i < j; i++) {
+					var $target = $(ch[i]);
+					var m = handleMonth(i+1);
+					$target.text(m + '月').data('time', year + '' + m);
+					var isValidate = monthValidate.call(this, i + 1);
+					var hasDisable = $target.hasClass('disable');
+					if(isValidate && hasDisable) {
+						$target.removeClass('disable');
+					} else if(!isValidate){
+						$target.addClass('disable');
+					}
+				}
+				$picker.find('.year').text(year);
+				toggleBtnState.call(this);
+			}
+			function handleMonth(month) {
+				return ('0' + month).slice(-2);
+			}
+			/**
+			* @desc 检查月份是否可选择
+			* @return true:年月可选则 false:不可选择 
+			*/
+			function monthValidate(month) {
+				if (this.year < this.maxYear) { // 以前的年份
+					return this.maxYear - this.year < this.gapYear ? true : (12 - month) <= this.max;
+				}
+				return month <= this.maxMonth;
+			}
+			function gerTemplate(month) {
+				var m = handleMonth(month),
+					year = this.year,
+					v = year + m;
+				if　(monthValidate.call(this, month)) {
+					return '<li data-time="'+ v +'">'+ m + '月</li>';
+				}
+				return '<li class="disable" data-time="'+ v +'">' + m + '月</li>';
+			}
+			function preYear() {
+				if (this.year + this.gapYear <= this.maxYear || this.$pre.attr('disabled')) { // 年份与当前年份差距不能大于gapYear
+					return;
+				}
+				this.year--;
+				updateOptions.call(this);
+			}
+			function nextYear() {
+				if (this.year >= this.maxYear || this.$next.attr('disabled')) { // 不能超过当前年份
+					return;
+				}
+				this.year++;
+				updateOptions.call(this);
+			}
+			/**
+			* @desc 判断按钮是否激活
+			*/
+			function btnIsDisabled($btn) {
+				return !! $btn.attr('disabled');
+			}
+			/**
+			* @desc 按钮不可选择
+			*/
+			function disableBtn($btn) {
+				btnIsDisabled($btn) ? void 0 : $btn.attr('disabled', 'disabled').addClass('dis');
+			}
+			/**
+			*@desc 按钮可以选择
+			*/
+			function enableBtn($btn) {
+				btnIsDisabled($btn) ? $btn.removeAttr('disabled').removeClass('dis') : void 0;
+			}	
+					
+			/**
+			* @desc 切换按钮状态
+			* @param $btn:需要控制的按钮
+			* @param flag:是否可点击(true:可点击/false:不可点击)
+			*/
+			function toggleBtnState() {
+				var year = this.year,
+					gapYear = this.gapYear,
+					maxYear = this.maxYear,
+					$next = this.$next,
+					$pre = this.$pre;
+				year === maxYear ? disableBtn($next) : enableBtn($next);
+				year + gapYear <= maxYear ? disableBtn($pre) : enableBtn($pre);
+			}
+			function onChange(d) {
+				this.callBack(d);
+			}
+			function getDate() {
+				return this.selectDate;
+			}
+			return {
+				init:init
+			}
+		})();
+		var p1 = null,
+			p2 = null;
+		$(document).ready(function() {
+			p1 = picker.init({
+					el: '#demo1',
+					onChange: function(d) {
+						console.log(d);
+					},
+					gapMonth: 4
+				});
+
+			p2 = picker.init({
+					el: '#demo2',
+					onChange: function(d) {
+						console.log(d);
+					},
+					gapMonth: 10
+				});
+		});
+	</script>
+</html>
